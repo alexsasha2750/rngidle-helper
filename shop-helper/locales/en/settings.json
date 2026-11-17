@@ -2,5 +2,9 @@
   "potionNumbersTitle": "Potion results",
   "potionNumbersLabel": "Show the number a potion found",
   "potionNumbersHelp": "Hover a potion’s result in the bulk-roll potion table and the number its best roll ended up as is added right after the EP. Works for variant potions and badge potions.",
-  "potionNumbersFine": "Only changes the hover text on your screen, right away. Nothing is sent to the game. If the game hides a number (a sealed bulk roll), there is nothing to add."
+  "potionNumbersFine": "Only changes the hover text on your screen, right away. Nothing is sent to the game. If the game hides a number (a sealed bulk roll), there is nothing to add.",
+  "gpuTitle": "Graphics",
+  "gpuLabel": "Use the discrete GPU on RNGidle",
+  "gpuHelp": "On a laptop with two graphics chips, asks Chrome to run the game on the faster one. Only applies to rngidle.fun.",
+  "gpuFine": "Reload the RNGidle tab after changing this. Chrome decides in the end: it works on computers with two graphics chips, and does nothing on others. It can’t change your system’s graphics settings."
 }

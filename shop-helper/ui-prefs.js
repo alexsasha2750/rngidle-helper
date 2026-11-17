@@ -33,6 +33,8 @@ export function normalizeUiPrefs(value) {
     calmGlitch: value?.calmGlitch === true,
     // Adds the number to the hover text of a potion's result in the bulk-roll potion table.
     potionNumbers: value?.potionNumbers === true,
+    // Asks the browser for the high-performance (discrete) GPU for the game page.
+    discreteGpu: value?.discreteGpu === true,
     launcher: {
       mode: LAUNCHER_MODES.includes(value?.launcher?.mode) ? value.launcher.mode : 'normal',
       size: LAUNCHER_SIZES.includes(value?.launcher?.size) ? value.launcher.size : 'normal',

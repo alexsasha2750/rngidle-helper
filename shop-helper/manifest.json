@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "RNGidle Shop Helper",
-  "version": "1.4.1",
-  "version_name": "v1.4.1",
+  "version": "1.4.2",
+  "version_name": "v1.4.2-test",
   "description": "Preview RNGidle numbers, buy selected shop and Black Market items, and try Glitch's trials, from a menu inside the game.",
   "minimum_chrome_version": "120",
   "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
@@ -23,7 +23,9 @@
   "content_scripts": [
     { "matches": ["https://rngidle.fun/*"], "js": ["i18n.js", "sound.js", "calm.js", "content.js", "overlay.js"], "run_at": "document_idle" },
     { "matches": ["https://rngidle.fun/*"], "js": ["potion-numbers.js"], "run_at": "document_idle" },
-    { "matches": ["https://rngidle.fun/*"], "js": ["potion-numbers-main.js"], "run_at": "document_idle", "world": "MAIN" }
+    { "matches": ["https://rngidle.fun/*"], "js": ["potion-numbers-main.js"], "run_at": "document_idle", "world": "MAIN" },
+    { "matches": ["https://rngidle.fun/*"], "js": ["gpu.js"], "run_at": "document_start" },
+    { "matches": ["https://rngidle.fun/*"], "js": ["gpu-main.js"], "run_at": "document_start", "world": "MAIN" }
   ],
   "web_accessible_resources": [{ "resources": ["popup.html", "locales/*/overlay.json"], "matches": ["https://rngidle.fun/*"] }]
 }

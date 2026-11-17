@@ -564,6 +564,15 @@
               <p class="fine-print" data-i18n="settings.potionNumbersFine">Only changes the hover text on your screen, right away. Nothing is sent to the game. If the game hides a number (a sealed bulk roll), there is nothing to add.</p>
             </section>
 
+            <section class="card" aria-labelledby="gpu-heading">
+              <h2 id="gpu-heading" data-i18n="settings.gpuTitle">Graphics</h2>
+              <label class="filter-option" for="discrete-gpu">
+                <input id="discrete-gpu" type="checkbox">
+                <span><strong data-i18n="settings.gpuLabel">Use the discrete GPU on RNGidle</strong><small data-i18n="settings.gpuHelp">On a laptop with two graphics chips, asks Chrome to run the game on the faster one. Only applies to rngidle.fun.</small></span>
+              </label>
+              <p class="fine-print" data-i18n="settings.gpuFine">Reload the RNGidle tab after changing this. Chrome decides in the end: it works on computers with two graphics chips, and does nothing on others. It can’t change your system’s graphics settings.</p>
+            </section>
+
             <section class="card" id="launcher-card" aria-labelledby="launcher-heading"></section>
 
             <section class="card" id="update-settings-card" aria-labelledby="update-settings-heading"></section>
