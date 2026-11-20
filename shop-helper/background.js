@@ -189,8 +189,12 @@ async function runCheck(depth = 0, dry = { count: 0, spent: 0 }) {
 
   const recovering = !!pendingPurchase;
   const safety = normalizeSafety(settings.safety);
-  // A purchase already sent (recovering) is always retried for real, even in a dry run.
-  const dryRun = safety.dryRun && !recovering;
+  // A stored request might not have reached the server. Replaying it can spend EP,
+  // so keep it intact and defer recovery until dry run is off.
+  if (recovering && safety.dryRun) {
+    return status('waiting', 'Dry run: an unfinished purchase was not retried. Turn off dry run to resume.', { gameTabOpen: true, signedIn: true });
+  }
+  const dryRun = safety.dryRun;
   if (!safety.dryRun && dryRunSeen !== undefined) await storage.remove('dryRunSeen');
   let seen = dryRun ? normalizeDryRunSeen(dryRunSeen) : {};
   const seenBefore = JSON.stringify(seen);
@@ -323,6 +327,9 @@ async function runCheck(depth = 0, dry = { count: 0, spent: 0 }) {
     await storage.set({ pendingPurchase });
   }
   const fresh = withBundleRule((await storage.get('settings')).settings);
+  if (recovering && normalizeSafety(fresh?.safety).dryRun) {
+    return status('waiting', 'Dry run: an unfinished purchase was not retried. Turn off dry run to resume.', { gameTabOpen: true, signedIn: true });
+  }
   // A cap lowered or a dry run switched on while this purchase was being prepared wins.
   if (!recovering && JSON.stringify(normalizeSafety(fresh?.safety)) !== JSON.stringify(safety)) {
     await storage.remove('pendingPurchase');
@@ -416,6 +423,19 @@ function check() {
   if (!running) running = runCheck().catch(error => status('error', `Shop check failed: ${error?.message || 'unknown error'}`)).finally(() => { running = null; });
   return running;
 }
+// A joining tab may become ready after an in-flight check already looked for a tab.
+// Coalesce joins during that check into one follow-up, without running purchases in parallel.
+let joinCheck = null;
+function checkOnJoin() {
+  if (!running) return check();
+  if (!joinCheck) {
+    joinCheck = running.then(() => {
+      joinCheck = null;
+      return check();
+    });
+  }
+  return joinCheck;
+}
 async function ensureAlarm() {
   if (!(await chrome.alarms.get(ALARM))) await chrome.alarms.create(ALARM, { periodInMinutes: 1 });
 }
@@ -450,7 +470,11 @@ function checkedRarity(rarity) {
   return { tier, label: label.slice(0, 40) };
 }
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === 'SITE_READY') { void check(); void updates.onSiteReady().catch(() => {}); return; }
+  if (message?.type === 'SITE_READY') {
+    void updates.onSiteReady().catch(() => {});
+    checkOnJoin().then(() => sendResponse({ ok: true }), () => sendResponse({ ok: false }));
+    return true;
+  }
   const updateReply = updates.handle(message);
   if (updateReply) { updateReply.then(sendResponse, () => sendResponse({ ok: false, error: 'Could not check for updates.' })); return true; }
   const glitchReply = glitch.handle(message);

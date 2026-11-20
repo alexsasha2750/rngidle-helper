@@ -176,7 +176,7 @@ test('a dry run on the Black Market simulates one deal per visit', async () => {
   assert.deepEqual(h.data.dryRunSeen, { 'blackMarket:market_item': '91:0' });
 });
 
-test('a purchase already sent is still retried for real during a dry run', async () => {
+test('dry run defers pending purchases, even if the worker stopped before sending', async () => {
   const pendingPurchase = {
     uid: 'a', item: 'luck_3', name: 'Luck Potion III', qty: 1, price: 250000, ruleQuantity: 1, mode: 'once',
     key: '10:0', slot: 10, accountId: 'account-1', requestId: 'req-old',
@@ -185,12 +185,16 @@ test('a purchase already sent is still retried for real during a dry run', async
     settings: { enabled: true, rules: [{ ...ruleA, quantity: 1 }, ruleB], safety: { dryRun: true } }, boundAccount: 'account-1', pendingPurchase,
   } });
   await h.check();
-  assert.deepEqual(h.sentOf('SITE_BUY').map(message => message.purchase.requestId), ['req-old']);
+  assert.equal(h.sentOf('SITE_BUY').length, 0);
+  assert.deepEqual(h.data.pendingPurchase, pendingPurchase);
+  assert.equal(h.data.spend, undefined);
+  assert.match(h.data.runStatus.message, /unfinished purchase was not retried/);
+
+  h.data.settings.safety.dryRun = false;
+  await h.check();
+  assert.equal(h.sentOf('SITE_BUY')[0].purchase.requestId, 'req-old');
   assert.equal(h.data.pendingPurchase, undefined);
   assert.equal(h.data.progress.a.status, 'complete');
-  assert.equal(h.data.spend.dayTotal, 250000);
-  assert.deepEqual(h.data.history.map(entry => [entry.result, entry.item]), [['bought', 'luck_3'], ['dryrun', 'luck_2']]);
-  assert.equal(h.data.runStatus.message, 'Dry run: would have bought 1 item(s) — nothing was spent.');
 });
 
 test('a daily cap limits quantities, blames itself only when it blocked something, and resets at midnight', async () => {
@@ -489,4 +493,20 @@ test('an old “Any bundle” rule and the new setting never both buy', async ()
   await h.check();
   assert.equal(h.sentOf('SITE_BUY').length, 0, 'the new setting is off, so the migrated-away rule does nothing');
   assert.equal(h.data.runStatus.message, 'Choose items to watch.');
+});
+
+test('a game tab joining during an alarm check gets a fresh shop check', async () => {
+  const h = await boot({ storage: {
+    settings: { enabled: true, rules: [ruleA], blackMarket: { enabled: true } },
+  } });
+  let finishIdentity;
+  h.world.replies.SITE_IDENTITY = () => new Promise(resolve => { finishIdentity = resolve; });
+  const alarm = h.alarm('check-shop');
+  await waitFor(() => finishIdentity);
+  const joins = [h.send({ type: 'SITE_READY' }), h.send({ type: 'SITE_READY' })];
+  delete h.world.replies.SITE_IDENTITY;
+  finishIdentity({ ok: true, data: { user: null } });
+  await Promise.all([alarm, ...joins]);
+  assert.equal(h.sentOf('SITE_BUY').length, 1);
+  assert.equal(h.sentOf('SITE_BUY_BLACK_MARKET').length, 1);
 });

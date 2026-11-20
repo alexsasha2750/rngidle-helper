@@ -53,7 +53,7 @@ Settings, status, and purchase activity are stored locally in the browser. The e
 ### Shops right now, and safety
 
 - **Shops right now** shows whether Glim's shop and the Black Market are open and a countdown to the end of the current slot, plus the live Black Market offers with how each price compares with your EP ("7% of your EP" or "Need 233B more"). EP is not earned at a steady rate, so it does not guess how long saving up would take.
-- **Dry run** makes auto-buy log what it *would* buy ("Dry run: would buy 3 × Luck Potion III") without sending any purchase, spending EP or marking anything as bought. Turn it off and the next check buys for real.
+- **Dry run** makes auto-buy log what it *would* buy ("Dry run: would buy 3 × Luck Potion III") without sending any purchase, spending EP or marking anything as bought. If a purchase is unfinished, dry run pauses instead of retrying it. Turning dry run off lets the next check resume real purchases. A request already in flight may still finish.
 - **Spending limit** caps what auto-buy spends per day (resets at your local midnight) or per browser session (resets when Chrome restarts). Auto-buy skips anything that would go over, and says so. Glitch purchases, which you make yourself, don't count towards it.
 - Both are saved with **Save settings** like the rest of your auto-buy settings.
 
