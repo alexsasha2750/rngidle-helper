@@ -31,6 +31,7 @@ export function bundleStatus(raw) {
   const value = finite(raw.value);
   const left = finite(raw.left);
   const bought = finite(raw.bought);
+  const perPlayer = finite(raw.perPlayer);
   return {
     name: typeof raw.name === 'string' ? raw.name.slice(0, 80) : '',
     emoji: typeof raw.emoji === 'string' ? raw.emoji.slice(0, 8) : '',
@@ -39,6 +40,7 @@ export function bundleStatus(raw) {
     value: value != null && value > 0 ? value : null,
     left: Number.isSafeInteger(left) && left >= 0 ? left : null,
     bought: Number.isSafeInteger(bought) && bought >= 0 ? bought : 0,
+    perPlayer: Number.isSafeInteger(perPlayer) && perPlayer >= 0 ? perPlayer : null,
     items,
   };
 }
