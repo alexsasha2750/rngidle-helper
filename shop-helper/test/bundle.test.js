@@ -4,6 +4,7 @@ import {
   bundleAllowed, bundleRule, bundleSignature, defaultBundle, discountOf, fromLegacyRule, normalizeBundle, rulesOf, withBundleRule,
 } from '../bundle.js';
 import { bundleRunLength, choosePurchase } from '../logic.js';
+import { verdictFor } from '../popup-bundle.js';
 
 const offer = (over = {}) => ({ type: 'rarity', name: 'Rarity Bundle', tier: 'mythic', items: { rarity_aberration: 5, rarity_otherworldly: 2 }, value: 2_000, price: 1_800, stock: 3, perPlayer: 3, bought: 0, left: 3, ...over });
 const shop = (over = {}, bundle = offer()) => ({ open: true, slot: 7, reroll: 0, wallet: { effective: 100_000 }, items: [], bundle, ...over });
@@ -62,6 +63,28 @@ test('the planner buys a bundle that passes and skips one that does not', () => 
   assert.equal(pick(settings({ minDiscount: 20 })), null, 'not discounted enough');
   assert.equal(pick(settings({ contains: ['luck_3'] })), null, 'does not hold what was asked for');
   assert.equal(pick(settings({ contains: ['rarity_aberration'], maxPrice: 2_000, minDiscount: 10 })).kind, 'bundle');
+});
+
+test('the planner respects the server per-player bundle quota', () => {
+  const apiOffer = offer({ price: 4_635_000, value: 5_150_000, left: 3, stock: 50, perPlayer: 1, bought: 0 });
+  const apiShop = shop({ wallet: { effective: 10_000_000 } }, apiOffer);
+  const planned = pick(settings({ quantity: 3 }), {}, apiShop);
+  assert.equal(planned.kind, 'bundle');
+  assert.equal(planned.targetQuantity, 1, 'the API says this player may buy only one');
+  assert.equal(bundleRunLength(planned, undefined, apiShop), 1, 'dry run must report the same one-bundle limit');
+  assert.equal(pick(settings({ quantity: 3 }), {}, shop({ wallet: { effective: 10_000_000 } }, { ...apiOffer, bought: 1 })), null,
+    'the player quota is exhausted after the one permitted purchase');
+});
+
+test('the live preview does not promise a bundle purchase when a switch or player quota blocks it', () => {
+  const apiOffer = offer({ left: 3, perPlayer: 1, bought: 0 });
+  const liveShop = { open: true, eaten: false, bundle: apiOffer };
+  const config = { enabled: true, maxPrice: null, minDiscount: 0, contains: [], reserve: 0 };
+  assert.equal(verdictFor(config, liveShop, 100_000), 'would');
+  assert.equal(verdictFor(config, liveShop, 100_000, false), 'off', 'the global auto-buy switch is also required');
+  assert.equal(verdictFor({ ...config, enabled: false }, liveShop, 100_000), 'off');
+  assert.equal(verdictFor(config, { ...liveShop, bundle: { ...apiOffer, bought: 1 } }, 100_000), 'sold',
+    'the player-specific limit is displayed as unavailable');
 });
 
 test('the EP reserve is never spent on a bundle', () => {
