@@ -289,6 +289,20 @@
                 <label><input type="radio" name="bundle-mode" value="restock" disabled><span data-i18n="bundle.modeRestock">Every new shop restock</span></label>
               </div>
               <p class="fine-print bundle-mode-help" id="bundle-mode-help"></p>
+              <div class="bundle-check-frequency">
+                <label class="field-label" for="shop-check-interval">
+                  <span data-i18n="bundle.checkIntervalLabel">Check Glim’s shop every</span>
+                  <span class="bundle-check-controls">
+                    <input id="shop-check-interval" type="number" min="30" max="3600" step="1" inputmode="numeric" value="60" disabled>
+                    <select id="shop-check-interval-unit" data-i18n-attr="aria-label:bundle.checkIntervalUnit" aria-label="Check interval unit" disabled>
+                      <option value="seconds" data-i18n="bundle.seconds">seconds</option>
+                      <option value="minutes" data-i18n="bundle.minutes">minutes</option>
+                    </select>
+                  </span>
+                </label>
+                <p class="fine-print" data-i18n="bundle.checkIntervalHelp">Minimum 30 seconds. Chrome may delay checks beyond the selected interval.</p>
+                <p class="field-error" id="shop-check-interval-error" role="alert" data-i18n="bundle.checkIntervalInvalid" hidden>Choose an interval from 30 seconds to 60 minutes.</p>
+              </div>
               <label class="field-label" for="bundle-quantity">
                 <span id="bundle-quantity-label">How many bundles per shop</span>
                 <input id="bundle-quantity" type="number" min="1" max="1000" step="1" inputmode="numeric" value="1" disabled>
