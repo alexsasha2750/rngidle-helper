@@ -1,13 +1,14 @@
 import { defaultBundle, fromLegacyRule, normalizeBundle } from "./bundle.js";
 import { createBundlePanel } from "./popup-bundle.js";
 import { normalizeRarity, rarityPill, rarityTitle, setRarity } from "./popup-rarity.js";
+import { DEFAULT_CHECK_INTERVAL_SECONDS, MAX_CHECK_INTERVAL_SECONDS, MIN_CHECK_INTERVAL_SECONDS, normalizeCheckIntervalSeconds } from "./check-interval.js";
 
 const state = {
   catalog: [],
   blackCatalog: [],
   snapshot: {},
-  draft: { enabled: false, rules: [], blackMarket: defaultBlackMarket(), bundle: defaultBundle(), safety: defaultSafety() },
-  saved: { enabled: false, rules: [], blackMarket: defaultBlackMarket(), bundle: defaultBundle(), safety: defaultSafety() },
+  draft: { enabled: false, rules: [], blackMarket: defaultBlackMarket(), bundle: defaultBundle(), safety: defaultSafety(), checkIntervalSeconds: DEFAULT_CHECK_INTERVAL_SECONDS },
+  saved: { enabled: false, rules: [], blackMarket: defaultBlackMarket(), bundle: defaultBundle(), safety: defaultSafety(), checkIntervalSeconds: DEFAULT_CHECK_INTERVAL_SECONDS },
   ready: false,
   catalogLoaded: false,
   blackCatalogLoaded: false,
@@ -15,6 +16,7 @@ const state = {
   blackFilter: "",
   saving: false,
   justAdded: null,
+  checkIntervalInvalid: false,
 };
 const priceFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
@@ -36,6 +38,9 @@ const elements = {
   unavailableItems: document.getElementById("unavailable-items"),
   saveMessage: document.getElementById("save-message"),
   saveButton: document.getElementById("save-button"),
+  checkIntervalValue: document.getElementById("shop-check-interval"),
+  checkIntervalUnit: document.getElementById("shop-check-interval-unit"),
+  checkIntervalError: document.getElementById("shop-check-interval-error"),
   activityEmpty: document.getElementById("activity-empty"),
   activityList: document.getElementById("activity-list"),
   blackMarketEnabled: document.getElementById("black-market-enabled"),
@@ -175,6 +180,7 @@ function normalizeSettings(value) {
     blackMarket: normalizeBlackMarket(value?.blackMarket),
     bundle: ownsBundle ? normalizeBundle(value.bundle) : (legacyBundle ?? defaultBundle()),
     safety: normalizeSafety(value?.safety),
+    checkIntervalSeconds: normalizeCheckIntervalSeconds(value?.checkIntervalSeconds),
   };
 }
 
@@ -197,7 +203,34 @@ function cloneSettings(settings) {
     },
     bundle: { ...settings.bundle, contains: [...settings.bundle.contains] },
     safety: { dryRun: settings.safety.dryRun, cap: { ...settings.safety.cap } },
+    checkIntervalSeconds: settings.checkIntervalSeconds,
   };
+}
+
+function renderCheckInterval() {
+  const seconds = normalizeCheckIntervalSeconds(state.draft.checkIntervalSeconds);
+  const useMinutes = seconds % 60 === 0;
+  elements.checkIntervalUnit.value = useMinutes ? "minutes" : "seconds";
+  elements.checkIntervalValue.value = String(useMinutes ? seconds / 60 : seconds);
+  elements.checkIntervalValue.min = useMinutes ? "1" : String(MIN_CHECK_INTERVAL_SECONDS);
+  elements.checkIntervalValue.max = useMinutes ? "60" : String(MAX_CHECK_INTERVAL_SECONDS);
+  elements.checkIntervalError.hidden = !state.checkIntervalInvalid;
+}
+
+function updateCheckIntervalFromControls() {
+  const amount = Number(elements.checkIntervalValue.value);
+  const factor = elements.checkIntervalUnit.value === "minutes" ? 60 : 1;
+  const seconds = amount * factor;
+  if (!Number.isSafeInteger(amount) || seconds < MIN_CHECK_INTERVAL_SECONDS || seconds > MAX_CHECK_INTERVAL_SECONDS) {
+    state.checkIntervalInvalid = true;
+    elements.checkIntervalError.hidden = false;
+    markDirty();
+    return;
+  }
+  state.checkIntervalInvalid = false;
+  state.draft.checkIntervalSeconds = seconds;
+  elements.checkIntervalError.hidden = true;
+  markDirty();
 }
 
 function settingsChanged() {
@@ -215,6 +248,8 @@ function updateSaveState() {
     elements.blackMarketMinimumEnabled,
     elements.blackMarketMinimumPrice,
     elements.blackMarketSearch,
+    elements.checkIntervalValue,
+    elements.checkIntervalUnit,
     elements.dryRun,
     elements.capEnabled,
     elements.capAmount,
@@ -229,7 +264,7 @@ function updateSaveState() {
     control.disabled = !state.ready || state.saving;
   }
   elements.clearBlackMarketUncertain.disabled = !state.ready || state.saving || state.saved.enabled || state.draft.enabled;
-  elements.saveButton.disabled = !state.ready || state.saving || !dirty;
+  elements.saveButton.disabled = !state.ready || state.saving || !dirty || state.checkIntervalInvalid;
   elements.saveRow.dataset.dirty = String(dirty);
   elements.enabledState.textContent = state.draft.enabled ? "On · changes need saving" : "Paused · changes need saving";
   if (!dirty) {
@@ -1021,6 +1056,19 @@ function bindEvents() {
     markDirty();
   });
 
+  elements.checkIntervalValue.addEventListener("input", updateCheckIntervalFromControls);
+  elements.checkIntervalUnit.addEventListener("change", () => {
+    const amount = Number(elements.checkIntervalValue.value);
+    const currentSeconds = Number.isSafeInteger(amount)
+      ? amount * (elements.checkIntervalUnit.value === "minutes" ? 60 : 1)
+      : state.draft.checkIntervalSeconds;
+    const nextAmount = elements.checkIntervalUnit.value === "minutes"
+      ? Math.max(1, Math.ceil(currentSeconds / 60))
+      : Math.max(MIN_CHECK_INTERVAL_SECONDS, Math.round(currentSeconds));
+    elements.checkIntervalValue.value = String(nextAmount);
+    updateCheckIntervalFromControls();
+  });
+
   elements.blackMarketEnabled.addEventListener("change", () => {
     state.draft.blackMarket.enabled = elements.blackMarketEnabled.checked;
     markDirty();
@@ -1189,6 +1237,12 @@ function loadBlackCatalog() {
 }
 
 function validateSettings() {
+  if (state.checkIntervalInvalid ||
+      !Number.isSafeInteger(state.draft.checkIntervalSeconds) ||
+      state.draft.checkIntervalSeconds < MIN_CHECK_INTERVAL_SECONDS ||
+      state.draft.checkIntervalSeconds > MAX_CHECK_INTERVAL_SECONDS) {
+    return "Set the shop check interval between 30 seconds and 60 minutes.";
+  }
   const seenUids = new Set();
   const seenIds = new Set();
   for (const rule of state.draft.rules) {
@@ -1243,6 +1297,7 @@ async function saveSettings() {
         : 0,
     },
     bundle: normalizeBundle(state.draft.bundle),
+    checkIntervalSeconds: state.draft.checkIntervalSeconds,
     safety: {
       dryRun: state.draft.safety.dryRun,
       cap: {
@@ -1273,6 +1328,7 @@ async function saveSettings() {
     renderCatalog();
     renderBlackMarket();
     bundlePanel.load();
+    renderCheckInterval();
     renderSafety();
 
     try {
@@ -1300,10 +1356,12 @@ function handleStorageChanges(changes, areaName) {
   if (settingsUpdated && !settingsChanged()) {
     state.saved = normalizeSettings(state.snapshot.settings);
     state.draft = cloneSettings(state.saved);
+    state.checkIntervalInvalid = false;
     elements.enabled.checked = state.draft.enabled;
     renderCatalog();
     renderBlackMarket();
     bundlePanel.load();
+    renderCheckInterval();
     renderSafety();
   } else if (settingsUpdated) {
     elements.saveMessage.textContent = "Settings changed elsewhere; your unsaved edits are still here.";
@@ -1333,8 +1391,10 @@ async function initialize() {
     state.snapshot = storageResult.value;
     state.saved = normalizeSettings(state.snapshot.settings);
     state.draft = cloneSettings(state.saved);
+    state.checkIntervalInvalid = false;
     state.ready = true;
     elements.enabled.checked = state.draft.enabled;
+    renderCheckInterval();
   } else {
     elements.saveMessage.textContent = "Could not read saved settings.";
   }
