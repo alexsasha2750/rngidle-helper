@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   bundleAllowed, bundleRule, bundleSignature, defaultBundle, discountOf, fromLegacyRule, normalizeBundle, rulesOf, withBundleRule,
 } from '../bundle.js';
-import { bundleRunLength, choosePurchase } from '../logic.js';
+import { bundleRunLength, bundleSkipReason, choosePurchase } from '../logic.js';
 import { verdictFor } from '../popup-bundle.js';
 
 const offer = (over = {}) => ({ type: 'rarity', name: 'Rarity Bundle', tier: 'mythic', items: { rarity_aberration: 5, rarity_otherworldly: 2 }, value: 2_000, price: 1_800, stock: 3, perPlayer: 3, bought: 0, left: 3, ...over });
@@ -63,6 +63,17 @@ test('the planner buys a bundle that passes and skips one that does not', () => 
   assert.equal(pick(settings({ minDiscount: 20 })), null, 'not discounted enough');
   assert.equal(pick(settings({ contains: ['luck_3'] })), null, 'does not hold what was asked for');
   assert.equal(pick(settings({ contains: ['rarity_aberration'], maxPrice: 2_000, minDiscount: 10 })).kind, 'bundle');
+});
+
+test('bundle diagnostics explain a rejected same-shop attempt and the new UID rearms it', () => {
+  const config = settings({ quantity: 1 });
+  const currentShop = shop();
+  const prior = { status: 'error', lastSlot: '7:0', message: 'Purchase declined: bundle purchase rejected' };
+  assert.equal(pick(config, { b1: prior }, currentShop), null, 'the failed attempt is intentionally not retried automatically');
+  assert.match(bundleSkipReason(config.bundle, prior, currentShop, Infinity, config.bundle), /Purchase declined/);
+  const rearmed = settings({ quantity: 1, uid: 'fresh-bundle-attempt' });
+  assert.equal(pick(rearmed, { b1: prior }, currentShop).kind, 'bundle', 'a fresh progress UID allows a deliberate retry');
+  assert.equal(bundleSkipReason(rearmed.bundle, undefined, currentShop, Infinity, rearmed.bundle), '');
 });
 
 test('the planner respects the server per-player bundle quota', () => {
