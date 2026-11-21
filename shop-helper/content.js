@@ -13,9 +13,18 @@
       signal: AbortSignal.timeout(20000)
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const reason = typeof data.error === 'string' ? data.error : (typeof data.message === 'string' ? data.message : `HTTP ${response.status}`);
-      return { ok: false, status: response.status, error: reason };
+    const nestedError = data?.error && typeof data.error === 'object' ? data.error.message : '';
+    const reason = typeof data?.error === 'string' ? data.error
+      : typeof nestedError === 'string' && nestedError ? nestedError
+      : typeof data?.message === 'string' ? data.message
+      : typeof data?.reason === 'string' ? data.reason
+      : '';
+    const rejected = !response.ok || data?.ok === false || data?.success === false || !!reason;
+    if (rejected) {
+      const serverStatus = Number(data?.status ?? data?.code);
+      const status = response.status >= 400 ? response.status
+        : Number.isInteger(serverStatus) && serverStatus >= 400 && serverStatus <= 599 ? serverStatus : 400;
+      return { ok: false, status, error: (reason || `HTTP ${response.status}`).slice(0, 300) };
     }
     return { ok: true, data };
   }
