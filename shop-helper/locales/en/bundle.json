@@ -15,6 +15,8 @@
   "nowItems": "Contains: {items}",
   "nowItemCount": "{count}× {name}",
   "verdictWould": "Your settings would buy this bundle.",
+  "verdictDryRun": "Dry run is on: this bundle matches, but nothing will be bought.",
+  "verdictUnsaved": "Save your settings before the automatic buyer can use them.",
   "verdictOff": "Bundle buying is switched off.",
   "verdictClosed": "Glim’s shop is closed right now.",
   "verdictPrice": "Too expensive for your price limit.",
