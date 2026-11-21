@@ -1,4 +1,4 @@
-import { blackMarketMatches, bundleRunLength, chooseBlackMarketPurchase, choosePurchase, shopKey } from './logic.js';
+import { blackMarketMatches, bundleRunLength, bundleSkipReason, chooseBlackMarketPurchase, choosePurchase, shopKey } from './logic.js';
 import { createGlitchService, GLITCH_ALARM } from './glitch.js';
 import {
   dryRunProgress, ensureSessionId, normalizeDryRunSeen, normalizeSafety, pruneDryRunSeen, recordSpend, remainingBudget,
@@ -211,6 +211,7 @@ async function runCheck(depth = 0, dry = { count: 0, spent: 0 }) {
   };
   let activeShop;
   let activeType;
+  let glimShop;
   let selection = null;
   // Set when the cap, and only the cap, stopped an otherwise eligible purchase.
   let capBlocked = false;
@@ -225,6 +226,7 @@ async function runCheck(depth = 0, dry = { count: 0, spent: 0 }) {
       if (!loaded.shop) return status('error', `Could not load the shop: ${loaded.error}`, { gameTabOpen: true, signedIn: true });
       activeShop = loaded.shop;
       activeType = 'shop';
+      glimShop = loaded.shop;
     }
     if (!pendingPurchase && activeShop) {
       const catalog = await catalogPromise;
@@ -275,6 +277,11 @@ async function runCheck(depth = 0, dry = { count: 0, spent: 0 }) {
     let message = market
       ? (closed ? 'The Black Market is closed. Waiting for it to reopen.' : 'Watching for eligible Black Market offers.')
       : (closed ? 'The shop is closed. Waiting for it to reopen.' : 'Watching for selected items, stock and enough EP.');
+    const bundleRule = rules.find(rule => rule.id === 'bundle');
+    if (bundleRule && glimShop) {
+      const reason = bundleSkipReason(bundleRule, progress[bundleRule.uid], glimShop, budget, settings.bundle);
+      if (reason) message += ` Bundle: ${reason}`;
+    }
     if (capBlocked) {
       state = 'waiting';
       message = limitMessage(safety, spentInPeriod(safety, spend, { now, sessionId }) + dry.spent);
