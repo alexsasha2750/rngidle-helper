@@ -144,6 +144,7 @@ async function recordResult(pending, result, progress, recovering, sessionId) {
     await activity(`${pending.name}: purchase declined (HTTP ${result.status}: ${reason}).`);
     await storage.remove('pendingPurchase');
     if (recovering) {
+      await status('error', `Could not confirm the earlier purchase of ${facts.name} (HTTP ${result.status}) — ${result.error || 'request rejected'}. Check inventory before retrying.`, { gameTabOpen: true, signedIn: true });
       await logHistory({ ...facts, result: 'uncertain', message: 'A previous request may have succeeded. Check your inventory.' });
       await notifier.announce('purchase', {
         title: `Purchase uncertain: ${facts.name}`,
@@ -155,7 +156,9 @@ async function recordResult(pending, result, progress, recovering, sessionId) {
       await logHistory({ ...facts, result: 'declined', message: `Purchase declined: ${reason}` });
       await notifier.announce('purchase', { title: `Purchase declined: ${facts.name}`, message: `${reason} · ${placeName(facts.source)}`, sound: 'fail' });
     }
-    return true;
+    // Stop this check so the diagnostic error above remains visible instead of being overwritten
+    // by the next idle/watch status in the same recursive run.
+    return false;
   }
   const retryReason = result.error || (result.status ? `HTTP ${result.status}` : 'network error');
   await status('waiting', `${result.status === 429 ? 'The game rate-limited the purchase' : 'Purchase result uncertain'}; will retry the same request: ${retryReason}`, { gameTabOpen: true, signedIn: true });
