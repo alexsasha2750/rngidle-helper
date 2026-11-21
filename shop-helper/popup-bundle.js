@@ -24,22 +24,28 @@ export function readEP(text) {
 }
 
 // What the settings would do with the bundle on offer: a short code the panel turns into a sentence.
-export function verdictFor(settings, shop, wallet) {
+export function verdictFor(settings, shop, wallet, autoBuyEnabled = true, dryRun = false, settingsSaved = true) {
   const offer = shop?.bundle;
   if (!offer) return null;
+  if (!settingsSaved) return 'unsaved';
   if (!shop.open || shop.eaten) return 'closed';
   if (offer.left !== null && offer.left < 1) return 'sold';
+  const perPlayer = offer.perPlayer;
+  if (perPlayer !== null && perPlayer !== undefined && Number.isFinite(Number(perPlayer)) &&
+      Number(perPlayer) - (Number(offer.bought) || 0) < 1) return 'sold';
   const allowed = bundleAllowed(settings, offer);
   if (!allowed.ok) return allowed.reason;
   if (Number.isFinite(wallet) && offer.price > Math.max(0, wallet - (Number(settings.reserve) || 0))) return 'poor';
-  return settings.enabled ? 'would' : 'off';
+  if (!settings.enabled || !autoBuyEnabled) return 'off';
+  if (dryRun) return 'dryRun';
+  return 'would';
 }
 
 export function createBundlePanel(api) {
   const $ = id => document.getElementById(id);
   const el = {
     panel: $('subpanel-bundle'),
-    enabled: $('bundle-enabled'), progress: $('bundle-progress'),
+    enabled: $('bundle-enabled'), progress: $('bundle-progress'), retry: $('bundle-retry'),
     modeRadios: [...document.querySelectorAll('input[name="bundle-mode"]')], modeHelp: $('bundle-mode-help'),
     quantity: $('bundle-quantity'), quantityLabel: $('bundle-quantity-label'), quantityError: $('bundle-quantity-error'),
     maxOn: $('bundle-max-price-on'), max: $('bundle-max-price'), maxError: $('bundle-max-price-error'),
@@ -70,6 +76,7 @@ export function createBundlePanel(api) {
   function renderDisabled() {
     const busy = !api.canEdit();
     for (const control of [el.enabled, el.quantity, el.maxOn, el.discountOn, el.reserveOn, el.search, ...el.modeRadios]) control.disabled = busy;
+    el.retry.disabled = busy;
     el.max.disabled = busy || !isOn('maxPrice');
     el.discount.disabled = busy || !isOn('minDiscount');
     el.reserve.disabled = busy || !isOn('reserve');
@@ -144,16 +151,27 @@ export function createBundlePanel(api) {
       el.nowVerdict.textContent = t('bundle.nowSignIn');
       return;
     }
-    const code = verdictFor(settings, shop, market.wallet);
-    el.nowVerdict.dataset.tone = code === 'would' ? 'good' : code === 'off' ? 'idle' : 'bad';
+    const code = verdictFor(
+      settings, shop, market.wallet,
+      api.getAutoBuyEnabled?.() ?? true,
+      api.getDryRunEnabled?.() ?? false,
+      api.isSettingsSaved?.() ?? true,
+    );
+    el.nowVerdict.dataset.tone = code === 'would' ? 'good' : ['off', 'dryRun', 'unsaved'].includes(code) ? 'idle' : 'bad';
     el.nowVerdict.textContent = t(`bundle.verdict${code[0].toUpperCase()}${code.slice(1)}`);
   }
 
   function renderProgress() {
-    const uid = bundle().uid || 'bundle:main';
-    const message = api.getProgress(uid)?.message;
+    const settings = bundle();
+    const progress = api.getProgress(settings.uid || 'bundle:main');
+    const message = progress?.message;
     el.progress.hidden = !(typeof message === 'string' && message);
     if (!el.progress.hidden) el.progress.textContent = t('bundle.progress', { message });
+    const canRearm = progress?.status === 'error' ||
+      (progress?.status === 'complete' && settings.mode === 'once');
+    el.retry.hidden = !canRearm;
+    el.retry.textContent = t(progress?.status === 'complete' ? 'bundle.restartOnce' : 'bundle.retryButton');
+    el.retry.disabled = !api.canEdit();
   }
 
   function render() {
@@ -177,7 +195,18 @@ export function createBundlePanel(api) {
   }
 
   el.enabled.addEventListener('change', () => edit({ enabled: el.enabled.checked }));
-  for (const radio of el.modeRadios) radio.addEventListener('change', () => { if (radio.checked) edit({ mode: radio.value }); });
+  for (const radio of el.modeRadios) radio.addEventListener('change', () => {
+    if (!radio.checked || radio.value === bundle().mode) return;
+    // Mode changes start a fresh progress record so an old error/completion cannot block the new mode.
+    edit({ mode: radio.value, uid: crypto.randomUUID() });
+  });
+  el.retry.addEventListener('click', () => {
+    const settings = bundle();
+    const progress = api.getProgress(settings.uid || 'bundle:main');
+    if (progress?.status !== 'error' &&
+        !(progress?.status === 'complete' && settings.mode === 'once')) return;
+    edit({ uid: crypto.randomUUID() });
+  });
 
   el.quantity.addEventListener('input', () => {
     const number = Number(el.quantity.value);

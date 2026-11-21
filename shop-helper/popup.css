@@ -864,3 +864,9 @@ html[data-theme="light"] .btn-danger { color: #fff; }
 
 /* Calm mode also stills the menu's own flicker on the Glitch tab. */
 html[data-calm="true"] .glitch-state { animation: none !important; }
+
+.bundle-check-frequency { display: grid; gap: 4px; margin-top: 12px; }
+.bundle-check-controls { display: flex; align-items: center; gap: 8px; }
+.bundle-check-controls input { width: 108px; min-width: 0; }
+.bundle-check-controls select { flex: 1; min-width: 0; }
+.bundle-check-frequency .fine-print { margin: 0; }

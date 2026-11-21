@@ -62,11 +62,11 @@ test('one failing endpoint only blanks its own part; both failing is an error', 
 
 test('the shop’s current bundle is trimmed and validated', () => {
   const raw = { type: 'rarity', name: 'Rarity Bundle', emoji: '☄️', tier: 'mythic', items: { rarity_aberration: 5, 'bad id!': 2, luck_3: 0, luck_4: 'x', rarity_otherworldly: '2' }, value: 2000, price: '1800', stock: 3, perPlayer: 1, bought: 0, left: 1, secret: 'x' };
-  assert.deepEqual(bundleStatus(raw), { name: 'Rarity Bundle', emoji: '☄️', tier: 'mythic', price: 1800, value: 2000, left: 1, bought: 0, items: { rarity_aberration: 5, rarity_otherworldly: 2 } });
+  assert.deepEqual(bundleStatus(raw), { name: 'Rarity Bundle', emoji: '☄️', tier: 'mythic', price: 1800, value: 2000, left: 1, bought: 0, perPlayer: 1, items: { rarity_aberration: 5, rarity_otherworldly: 2 } });
   assert.equal(bundleStatus(null), null);
   assert.equal(bundleStatus({ name: 'No price' }), null, 'a bundle with no usable price is not shown');
   assert.equal(bundleStatus({ price: -4 }), null);
-  assert.deepEqual(bundleStatus({ price: 10 }), { name: '', emoji: '', tier: '', price: 10, value: null, left: null, bought: 0, items: {} });
+  assert.deepEqual(bundleStatus({ price: 10 }), { name: '', emoji: '', tier: '', price: 10, value: null, left: null, bought: 0, perPlayer: null, items: {} });
   assert.equal(shopStatus({ open: true, bundle: raw }).bundle.price, 1800, 'it rides along with the shop status');
   assert.equal(shopStatus({ open: true }).bundle, null);
 });

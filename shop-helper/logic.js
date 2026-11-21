@@ -16,6 +16,48 @@ function validRule(rule) {
 // A spending cap allowance: Infinity when there is no cap; anything unusable fails closed.
 const allowanceOf = budget => (typeof budget === 'number' && budget >= 0 ? budget : 0);
 
+export function bundleSkipReason(rule, previous, shop, budget = Infinity, filters = null) {
+  if (previous?.status === 'uncertain') return previous.message || 'A previous result is uncertain; check inventory before trying again.';
+  if (previous?.status === 'complete') return previous.message || 'This bundle rule is already complete.';
+  const key = shopKey(shop);
+  if (previous?.status === 'error' && previous.lastSlot === key) {
+    return previous.message || 'The last purchase was rejected in this shop. Use Retry this shop to try again.';
+  }
+  if (!shop) return 'The shop could not be loaded.';
+  if (!shop.open || shop.eaten) return 'Glim’s shop is closed.';
+  const offer = shop.bundle ?? shop.items?.find(entry => entry.id === 'bundle');
+  if (!offer) return 'There is no bundle in the current shop.';
+  const left = Number(offer.left);
+  const bought = offer.bought == null ? 0 : Number(offer.bought);
+  const price = Number(offer.price);
+  if (!Number.isSafeInteger(left) || left < 1) return 'The shop reports no bundle stock remaining.';
+  if (!Number.isSafeInteger(bought) || bought < 0 || !Number.isFinite(price) || price <= 0) return 'The bundle price or stock data from the game is invalid.';
+  const perPlayer = offer.perPlayer == null ? Infinity : Number(offer.perPlayer);
+  if (Number.isFinite(perPlayer) && perPlayer - bought < 1) return 'The per-player bundle limit has already been reached.';
+  const stock = Math.min(left, Math.max(0, MAX_BUNDLES_PER_SHOP - bought), Number.isFinite(perPlayer) ? Math.max(0, perPlayer - bought) : Infinity);
+  const wallet = Number(shop.wallet?.effective);
+  if (!Number.isFinite(wallet) || wallet < 0) return 'The extension could not read your EP balance.';
+  const reserve = filters ? Math.max(0, Number(filters.reserve) || 0) : 0;
+  if (filters && !bundleAllowed(filters, offer).ok) {
+    const reason = bundleAllowed(filters, offer).reason;
+    return reason === 'price' ? 'The bundle is above your maximum price.'
+      : reason === 'discount' ? 'The bundle does not meet your minimum discount.'
+      : 'The bundle does not contain any of the selected items.';
+  }
+  const affordable = Math.floor(Math.max(0, wallet - reserve) / price);
+  if (stock < 1) return 'The bundle is not available within the shop or player limit.';
+  if (affordable < 1) return 'There is not enough EP after your reserve.';
+  if (price > (typeof budget === 'number' && budget >= 0 ? budget : 0)) return 'The spending limit blocks this purchase.';
+  if (rule.mode === 'once') {
+    if (previous?.totalBought > 0 && previous.lastSlot !== key) return 'The one-time purchase was already started in an earlier shop.';
+    const target = previous?.targetQuantity ?? Math.min(rule.quantity, stock, affordable);
+    if (!Number.isSafeInteger(target) || target < 1 || (previous?.totalBought ?? 0) >= target) return 'The one-time bundle target has already been reached.';
+  } else if (previous?.lastSlot === key && (previous?.slotBought ?? 0) >= (previous?.slotTarget ?? rule.quantity)) {
+    return 'The selected number of bundles for this shop has already been reached.';
+  }
+  return '';
+}
+
 function chooseBundle(rule, previous, shop, key, wallet, budget = Infinity, filters = null) {
   if (previous?.status === 'complete' || previous?.status === 'uncertain' ||
       (previous?.status === 'error' && previous.lastSlot === key)) return null;
@@ -26,7 +68,8 @@ function chooseBundle(rule, previous, shop, key, wallet, budget = Infinity, filt
   if (!Number.isSafeInteger(left) || left < 1 || !Number.isSafeInteger(bought) || bought < 0 ||
       !Number.isFinite(price) || price <= 0) return null;
 
-  const stock = Math.min(left, Math.max(0, MAX_BUNDLES_PER_SHOP - bought));
+  const playerLimit = offer?.perPlayer == null ? Infinity : Math.max(0, Number(offer.perPlayer) - bought);
+  const stock = Math.min(left, Math.max(0, MAX_BUNDLES_PER_SHOP - bought), playerLimit);
   // EP the player asked to keep is not spent on bundles.
   const reserve = filters ? Math.max(0, Number(filters.reserve) || 0) : 0;
   const affordable = Math.floor(Math.max(0, wallet - reserve) / price);
@@ -100,7 +143,8 @@ export function bundleRunLength(selection, previous, shop, budget = Infinity) {
   const price = Number(selection?.item?.price);
   if (!offer || !Number.isFinite(price) || price <= 0) return 1;
   const bought = offer.bought == null ? 0 : Number(offer.bought);
-  const stock = Math.min(Number(offer.left), Math.max(0, MAX_BUNDLES_PER_SHOP - bought));
+  const playerLimit = offer.perPlayer == null ? Infinity : Math.max(0, Number(offer.perPlayer) - bought);
+  const stock = Math.min(Number(offer.left), Math.max(0, MAX_BUNDLES_PER_SHOP - bought), playerLimit);
   const already = selection.rule?.mode === 'once'
     ? previous?.totalBought ?? 0
     : (previous?.lastSlot === selection.key ? previous.slotBought ?? 0 : 0);
