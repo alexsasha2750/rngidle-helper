@@ -81,6 +81,8 @@ test('the live preview does not promise a bundle purchase when a switch or playe
   const liveShop = { open: true, eaten: false, bundle: apiOffer };
   const config = { enabled: true, maxPrice: null, minDiscount: 0, contains: [], reserve: 0 };
   assert.equal(verdictFor(config, liveShop, 100_000), 'would');
+  assert.equal(verdictFor(config, liveShop, 100_000, true, true, true), 'dryRun', 'dry-run never promises a live purchase');
+  assert.equal(verdictFor(config, liveShop, 100_000, true, false, false), 'unsaved', 'unsaved settings are not used by the background service');
   assert.equal(verdictFor(config, liveShop, 100_000, false), 'off', 'the global auto-buy switch is also required');
   assert.equal(verdictFor({ ...config, enabled: false }, liveShop, 100_000), 'off');
   assert.equal(verdictFor(config, { ...liveShop, bundle: { ...apiOffer, bought: 1 } }, 100_000), 'sold',
