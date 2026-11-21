@@ -25,6 +25,8 @@
   "verdictPoor": "You would not have enough EP left after your reserve.",
   "verdictSold": "No more are available for you in this shop.",
   "progress": "So far: {message}",
+  "retryButton": "Retry this shop (save to apply)",
+  "restartOnce": "Start this one-time rule again (save to apply)",
   "whenHeading": "When to buy",
   "whenHelp": "How often and how many. The game allows up to 3 bundles per shop, depending on your shop level.",
   "modeLegend": "Buy",
