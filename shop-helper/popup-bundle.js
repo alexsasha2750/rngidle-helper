@@ -156,7 +156,7 @@ export function createBundlePanel(api) {
       api.getDryRunEnabled?.() ?? false,
       api.isSettingsSaved?.() ?? true,
     );
-    el.nowVerdict.dataset.tone = code === 'would' ? 'good' : code === 'off' ? 'idle' : 'bad';
+    el.nowVerdict.dataset.tone = code === 'would' ? 'good' : ['off', 'dryRun', 'unsaved'].includes(code) ? 'idle' : 'bad';
     el.nowVerdict.textContent = t(`bundle.verdict${code[0].toUpperCase()}${code.slice(1)}`);
   }
 
