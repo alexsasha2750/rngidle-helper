@@ -26,7 +26,8 @@ function chooseBundle(rule, previous, shop, key, wallet, budget = Infinity, filt
   if (!Number.isSafeInteger(left) || left < 1 || !Number.isSafeInteger(bought) || bought < 0 ||
       !Number.isFinite(price) || price <= 0) return null;
 
-  const stock = Math.min(left, Math.max(0, MAX_BUNDLES_PER_SHOP - bought));
+  const playerLimit = offer?.perPlayer == null ? Infinity : Math.max(0, Number(offer.perPlayer) - bought);
+  const stock = Math.min(left, Math.max(0, MAX_BUNDLES_PER_SHOP - bought), playerLimit);
   // EP the player asked to keep is not spent on bundles.
   const reserve = filters ? Math.max(0, Number(filters.reserve) || 0) : 0;
   const affordable = Math.floor(Math.max(0, wallet - reserve) / price);
@@ -100,7 +101,8 @@ export function bundleRunLength(selection, previous, shop, budget = Infinity) {
   const price = Number(selection?.item?.price);
   if (!offer || !Number.isFinite(price) || price <= 0) return 1;
   const bought = offer.bought == null ? 0 : Number(offer.bought);
-  const stock = Math.min(Number(offer.left), Math.max(0, MAX_BUNDLES_PER_SHOP - bought));
+  const playerLimit = offer.perPlayer == null ? Infinity : Math.max(0, Number(offer.perPlayer) - bought);
+  const stock = Math.min(Number(offer.left), Math.max(0, MAX_BUNDLES_PER_SHOP - bought), playerLimit);
   const already = selection.rule?.mode === 'once'
     ? previous?.totalBought ?? 0
     : (previous?.lastSlot === selection.key ? previous.slotBought ?? 0 : 0);
