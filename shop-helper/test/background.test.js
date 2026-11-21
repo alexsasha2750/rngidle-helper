@@ -171,6 +171,20 @@ test('background buys eligible selections safely and recovers a lost response', 
   assert.equal(data.progress['partial-bundle'].totalBought, 1);
 
   data.settings.rules = [];
+  data.settings = {
+    enabled: true,
+    rules: [],
+    bundle: { enabled: true, uid: 'bundle:main', mode: 'restock', quantity: 3, maxPrice: null, minDiscount: 0, contains: [], reserve: 0 },
+    safety: { dryRun: false, cap: { enabled: false, amount: 0, period: 'day' } }
+  };
+  shop.slot++;
+  shop.bundle = { left: 3, bought: 0, price: 100, perPlayer: 1 };
+  const beforeNewFormatBundle = requests.length;
+  await check();
+  assert.equal(requests.length, beforeNewFormatBundle + 1, 'new-format bundle settings produce exactly one purchase when perPlayer is 1');
+  assert.equal(requests.at(-1).item, 'bundle');
+  assert.equal(data.progress['bundle:main'].slotBought, 1);
+
   data.settings.blackMarket = {
     enabled: true, mostExpensive: false, selectedOnly: true, itemIds: ['market_item'],
     minimumEnabled: true, minimumPrice: 75
