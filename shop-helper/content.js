@@ -14,17 +14,20 @@
     });
     const data = await response.json().catch(() => ({}));
     const nestedError = data?.error && typeof data.error === 'object' ? data.error.message : '';
-    const reason = typeof data?.error === 'string' ? data.error
+    const explicitError = typeof data?.error === 'string' ? data.error
       : typeof nestedError === 'string' && nestedError ? nestedError
-      : typeof data?.message === 'string' ? data.message
-      : typeof data?.reason === 'string' ? data.reason
       : '';
-    const rejected = !response.ok || data?.ok === false || data?.success === false || !!reason;
+    const logicalFailure = data?.ok === false || data?.success === false;
+    const rejected = !response.ok || logicalFailure || !!explicitError;
     if (rejected) {
+      const reason = explicitError ||
+        (logicalFailure && typeof data?.message === 'string' ? data.message : '') ||
+        (typeof data?.reason === 'string' ? data.reason : '') ||
+        `HTTP ${response.status}`;
       const serverStatus = Number(data?.status ?? data?.code);
       const status = response.status >= 400 ? response.status
         : Number.isInteger(serverStatus) && serverStatus >= 400 && serverStatus <= 599 ? serverStatus : 400;
-      return { ok: false, status, error: (reason || `HTTP ${response.status}`).slice(0, 300) };
+      return { ok: false, status, error: reason.slice(0, 300) };
     }
     return { ok: true, data };
   }
