@@ -196,6 +196,11 @@ test('background buys eligible selections safely and recovers a lost response', 
   assert.equal(data.progress['bundle:main'].status, 'error', 'a rejected bundle purchase is recorded as an error');
   assert.match(data.runStatus.message, /bundle purchase rejected for test/i, 'the server rejection stays visible in the main status');
   assert.equal(data.pendingPurchase, undefined, 'a definitive 4xx rejection is not left pending');
+  const beforeManualRetry = requests.length;
+  data.settings.bundle.uid = 'bundle:manual-retry';
+  await check();
+  assert.equal(requests.length, beforeManualRetry + 1, 'changing the bundle progress UID permits a deliberate retry in the same shop');
+  assert.equal(data.progress['bundle:manual-retry'].slotBought, 1);
 
   data.settings.blackMarket = {
     enabled: true, mostExpensive: false, selectedOnly: true, itemIds: ['market_item'],
