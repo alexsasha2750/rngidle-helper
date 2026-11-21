@@ -9,7 +9,7 @@ test('background buys eligible selections safely and recovers a lost response', 
   const a = catalog.find(item => item.id === 'luck_1');
   const b = catalog.find(item => item.id === 'luck_2');
   let account = 'account-1', openTab = true, lost = false, mismatch = false, rejectRetry = false;
-  let walletFromInventory = false, removeRemainingBundles = false;
+  let walletFromInventory = false, removeRemainingBundles = false, rejectNextBundle = false;
   let requests = [], completed = new Map();
   let market = { open: true, slot: 90, wallet: { effective: 500 }, items: [
     { id: 'market_item', price: 75, left: 1, bought: false }
@@ -58,6 +58,10 @@ test('background buys eligible selections safely and recovers a lost response', 
         if (message.type === 'SITE_BUY') {
           const p = message.purchase;
           requests.push(clone(p));
+          if (p.item === 'bundle' && rejectNextBundle) {
+            rejectNextBundle = false;
+            return { ok: false, status: 400, error: 'bundle purchase rejected for test' };
+          }
           if (rejectRetry && completed.has(p.requestId)) return { ok: false, status: 409, error: 'expired request' };
           if (!completed.has(p.requestId)) {
             if (p.item === 'bundle') {
@@ -184,6 +188,14 @@ test('background buys eligible selections safely and recovers a lost response', 
   assert.equal(requests.length, beforeNewFormatBundle + 1, 'new-format bundle settings produce exactly one purchase when perPlayer is 1');
   assert.equal(requests.at(-1).item, 'bundle');
   assert.equal(data.progress['bundle:main'].slotBought, 1);
+
+  shop.slot++;
+  shop.bundle = { left: 3, bought: 0, price: 100, perPlayer: 1 };
+  rejectNextBundle = true;
+  await check();
+  assert.equal(data.progress['bundle:main'].status, 'error', 'a rejected bundle purchase is recorded as an error');
+  assert.match(data.runStatus.message, /bundle purchase rejected for test/i, 'the server rejection stays visible in the main status');
+  assert.equal(data.pendingPurchase, undefined, 'a definitive 4xx rejection is not left pending');
 
   data.settings.blackMarket = {
     enabled: true, mostExpensive: false, selectedOnly: true, itemIds: ['market_item'],
