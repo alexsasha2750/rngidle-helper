@@ -87,6 +87,8 @@ const elements = {
 const bundlePanel = createBundlePanel({
   getBundle: () => state.draft.bundle,
   getAutoBuyEnabled: () => state.saved.enabled,
+  getDryRunEnabled: () => state.saved.safety.dryRun,
+  isSettingsSaved: () => !settingsChanged(),
   patch(change) {
     state.draft.bundle = normalizeBundle({ ...state.draft.bundle, ...change });
     markDirty();
