@@ -24,9 +24,10 @@ export function readEP(text) {
 }
 
 // What the settings would do with the bundle on offer: a short code the panel turns into a sentence.
-export function verdictFor(settings, shop, wallet, autoBuyEnabled = true) {
+export function verdictFor(settings, shop, wallet, autoBuyEnabled = true, dryRun = false, settingsSaved = true) {
   const offer = shop?.bundle;
   if (!offer) return null;
+  if (!settingsSaved) return 'unsaved';
   if (!shop.open || shop.eaten) return 'closed';
   if (offer.left !== null && offer.left < 1) return 'sold';
   const perPlayer = offer.perPlayer;
@@ -35,7 +36,9 @@ export function verdictFor(settings, shop, wallet, autoBuyEnabled = true) {
   const allowed = bundleAllowed(settings, offer);
   if (!allowed.ok) return allowed.reason;
   if (Number.isFinite(wallet) && offer.price > Math.max(0, wallet - (Number(settings.reserve) || 0))) return 'poor';
-  return settings.enabled && autoBuyEnabled ? 'would' : 'off';
+  if (!settings.enabled || !autoBuyEnabled) return 'off';
+  if (dryRun) return 'dryRun';
+  return 'would';
 }
 
 export function createBundlePanel(api) {
@@ -147,7 +150,12 @@ export function createBundlePanel(api) {
       el.nowVerdict.textContent = t('bundle.nowSignIn');
       return;
     }
-    const code = verdictFor(settings, shop, market.wallet, api.getAutoBuyEnabled?.() ?? true);
+    const code = verdictFor(
+      settings, shop, market.wallet,
+      api.getAutoBuyEnabled?.() ?? true,
+      api.getDryRunEnabled?.() ?? false,
+      api.isSettingsSaved?.() ?? true,
+    );
     el.nowVerdict.dataset.tone = code === 'would' ? 'good' : code === 'off' ? 'idle' : 'bad';
     el.nowVerdict.textContent = t(`bundle.verdict${code[0].toUpperCase()}${code.slice(1)}`);
   }
