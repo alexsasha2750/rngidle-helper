@@ -11,6 +11,7 @@ import { normalizeUiPrefs, wantsEvent } from './ui-prefs.js';
 import { bundleSignature, rulesOf, withBundleRule } from './bundle.js';
 import { createUpdateService } from './update-service.js';
 import { registerMenuCommands } from './menu-commands.js';
+import { syncCheckAlarm } from './check-interval.js';
 
 const ALARM = 'check-shop';
 const storage = chrome.storage.local;
@@ -138,7 +139,9 @@ async function recordResult(pending, result, progress, recovering, sessionId) {
       ? { ...previous, status: 'uncertain', lastSlot, message: 'A previous request may have succeeded. Check your inventory, then remove and re-add this item if needed.' }
       : { ...previous, status: partialOnceBundle ? 'complete' : 'error', lastSlot, message: `Purchase declined: ${result.error}` };
     await storage.set({ progress });
-    await activity(`${pending.name}: purchase declined (${result.error}).`);
+    const reason = result.error || `HTTP ${result.status}`;
+    await status('error', `${pending.name}: purchase rejected (HTTP ${result.status}) — ${reason}`, { gameTabOpen: true, signedIn: true });
+    await activity(`${pending.name}: purchase declined (HTTP ${result.status}: ${reason}).`);
     await storage.remove('pendingPurchase');
     if (recovering) {
       await logHistory({ ...facts, result: 'uncertain', message: 'A previous request may have succeeded. Check your inventory.' });
@@ -154,7 +157,8 @@ async function recordResult(pending, result, progress, recovering, sessionId) {
     }
     return true;
   }
-  await status('waiting', `Purchase result uncertain; will retry the same request: ${result.error || 'network error'}`, { gameTabOpen: true, signedIn: true });
+  const retryReason = result.error || (result.status ? `HTTP ${result.status}` : 'network error');
+  await status('waiting', `${result.status === 429 ? 'The game rate-limited the purchase' : 'Purchase result uncertain'}; will retry the same request: ${retryReason}`, { gameTabOpen: true, signedIn: true });
   return false;
 }
 // `dry` carries what earlier dry-run picks in this check would have spent; it is never stored.
@@ -417,7 +421,8 @@ function check() {
   return running;
 }
 async function ensureAlarm() {
-  if (!(await chrome.alarms.get(ALARM))) await chrome.alarms.create(ALARM, { periodInMinutes: 1 });
+  const { settings } = await storage.get('settings');
+  await syncCheckAlarm(chrome.alarms, settings?.checkIntervalSeconds, ALARM);
 }
 const glitch = createGlitchService({
   storage, getTab, site, activity, loadNames: () => glitchNamesPromise, announce: notifier.announce,
